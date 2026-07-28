@@ -1,10 +1,24 @@
 import os
+import threading
+from flask import Flask
 import discord
 from discord.ext import tasks, commands
 import requests
 from datetime import datetime
 import pytz
 
+# --- MINI SERVEUR WEB POUR SATISFAIRE RENDER ---
+app = Flask(__name__)
+
+@app.route('/')
+def home():
+    return "Bot Discord est en ligne !"
+
+def run_web():
+    port = int(os.environ.get("PORT", 10000))
+    app.run(host='0.0.0.0', port=port)
+
+# --- CONFIGURATION DU BOT DISCORD ---
 TOKEN = os.getenv('DISCORD_TOKEN')
 DISCORD_USER_ID = int(os.getenv('MY_DISCORD_ID', '0'))
 GF_DISCORD_ID = int(os.getenv('GF_DISCORD_ID', '0'))
@@ -48,7 +62,7 @@ async def on_message(message):
             user = await bot.fetch_user(DISCORD_USER_ID)
             await user.send(f"🥽 **Nouvelle soirée VRChat détectée !**\n{message.jump_url}")
 
-# 3. Alerte Streamers Twitch (toutes les 3 minutes)
+# 3. Alerte Streamers Twitch
 @tasks.loop(minutes=3)
 async def check_twitch():
     if not is_active_hours():
@@ -73,4 +87,9 @@ async def check_twitch():
         except Exception as e:
             print(f"Erreur Twitch: {e}")
 
-bot.run(TOKEN)
+if __name__ == "__main__":
+    # Lancer le serveur Web en arrière-plan
+    t = threading.Thread(target=run_web)
+    t.start()
+    # Lancer le bot Discord
+    bot.run(TOKEN)
