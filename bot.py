@@ -1,5 +1,7 @@
 import os
 import threading
+import sys
+import traceback
 from flask import Flask
 import discord
 from discord.ext import tasks, commands
@@ -7,18 +9,18 @@ import requests
 from datetime import datetime
 import pytz
 
-# --- MINI SERVEUR WEB POUR SATISFAIRE RENDER ---
+# --- MINI SERVEUR WEB POUR KEEP-ALIVE ---
 app = Flask(__name__)
 
 @app.route('/')
 def home():
-    return "Bot Discord est en ligne !"
+    return "Bot Discord actif 24/7 !"
 
 def run_web():
     port = int(os.environ.get("PORT", 10000))
     app.run(host='0.0.0.0', port=port)
 
-# --- CONFIGURATION DU BOT DISCORD ---
+# --- CONFIGURATION DU BOT ---
 TOKEN = os.getenv('DISCORD_TOKEN')
 DISCORD_USER_ID = int(os.getenv('MY_DISCORD_ID', '0'))
 GF_DISCORD_ID = int(os.getenv('GF_DISCORD_ID', '0'))
@@ -40,10 +42,30 @@ def is_active_hours():
     now = datetime.now(tz)
     return 10 <= now.hour < 22
 
+# --- GESTIONNAIRE D'ERREURS GLOBAL ---
+@bot.event
+async def on_error(event, *args, **kwargs):
+    """Envoie un MP si une erreur imprévue survient dans un événement."""
+    error_msg = traceback.format_exc()
+    print(f"Erreur détectée : {error_msg}")
+    try:
+        user = await bot.fetch_user(DISCORD_USER_ID)
+        await user.send(f"⚠️ **Erreur détectée sur le bot !**\n```python\n{error_msg[:1800]}\n```")
+    except Exception as e:
+        print(f"Impossible d'envoyer le MP d'erreur : {e}")
+
+# --- ÉVÉNEMENT : BOT PRÊT ---
 @bot.event
 async def on_ready():
     print(f"Bot connecté sous le nom : {bot.user}")
     check_twitch.start()
+    
+    # Message MP au démarrage / fin de configuration
+    try:
+        user = await bot.fetch_user(DISCORD_USER_ID)
+        await user.send("✅ **Le bot est démarré et entièrement configuré !** Prêt à surveiller les vocals, VRChat et Twitch.")
+    except Exception as e:
+        print(f"Erreur envoi MP de bienvenu : {e}")
 
 # 1. Alerte Copine en Vocal
 @bot.event
@@ -62,7 +84,7 @@ async def on_message(message):
             user = await bot.fetch_user(DISCORD_USER_ID)
             await user.send(f"🥽 **Nouvelle soirée VRChat détectée !**\n{message.jump_url}")
 
-# 3. Alerte Streamers Twitch
+# 3. Alerte Streamers Twitch (en MP)
 @tasks.loop(minutes=3)
 async def check_twitch():
     if not is_active_hours():
@@ -88,8 +110,6 @@ async def check_twitch():
             print(f"Erreur Twitch: {e}")
 
 if __name__ == "__main__":
-    # Lancer le serveur Web en arrière-plan
     t = threading.Thread(target=run_web)
     t.start()
-    # Lancer le bot Discord
     bot.run(TOKEN)
