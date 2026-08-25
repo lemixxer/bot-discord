@@ -6,6 +6,7 @@ from discord.ext import commands, tasks
 from flask import Flask  # Assure-toi d'avoir 'flask' dans requirements.txt !
 
 # --- 1. Petit serveur web pour Render ---
+@app.route("/webhook-twitch", methods=['POST'])
 app = Flask("")
 
 
