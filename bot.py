@@ -3,6 +3,20 @@ import threading  # <--- C'est ça qu'il manquait !
 import aiohttp
 import discord
 from discord.ext import commands, tasks
+from flask import Flask  # Assure-toi d'avoir 'flask' dans requirements.txt !
+
+# --- 1. Petit serveur web pour Render ---
+app = Flask("")
+
+
+@app.route("/")
+def home():
+  return "Shiro est en ligne !"
+
+
+def run_web():
+  # Render attribue un port via les variables d'environnement, par défaut 8080
+  app.run(host="0.0.0.0", port=8080)
 
 
 intents = discord.Intents.default()
