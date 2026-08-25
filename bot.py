@@ -1,39 +1,111 @@
-import os
-import threading
-import sys
-import traceback
-from flask import Flask
-import discord
-from discord.ext import tasks, commands
-import requests
 from datetime import datetime
-import pytz
-
-# --- MINI SERVEUR WEB POUR KEEP-ALIVE ---
-app = Flask(__name__)
-
-@app.route('/')
-def home():
-    return "Bot Discord actif 24/7 !"
-
-def run_web():
-    port = int(os.environ.get("PORT", 10000))
-    app.run(host='0.0.0.0', port=port)
-
-# --- CONFIGURATION DU BOT ---
-TOKEN = os.getenv('DISCORD_TOKEN')
-DISCORD_USER_ID = int(os.getenv('MY_DISCORD_ID', '0'))
-GF_DISCORD_ID = int(os.getenv('GF_DISCORD_ID', '0'))
-VRC_CHANNEL_ID = int(os.getenv('VRC_CHANNEL_ID', '0'))
-
-STREAMERS = ['just1chat', 'katchan', 'mielcrapoulle']
-live_status = {s: False for s in STREAMERS}
-
-# File d'attente pour les notifications de nuit
-night_notifications = []
+import aiohttp  # Nécessaire pour interroger l'API Twitch (ou l'état du live)
+import discord
+from discord.ext import commands, tasks
 
 intents = discord.Intents.default()
-intents.voice_states = True
+intents.message_content = True
+bot = commands.Bot(command_prefix="!", intents=intents)
+
+MON_ID_DISCORD = 123456789012345678  # Remplace par ton ID Discord
+TWITCH_USERNAME = "limposteur09"
+
+# Liste tampon pour stocker les événements de la nuit
+evenements_nuit = []
+resume_deja_envoye_ce_matin = False
+
+
+@bot.event
+async def on_ready():
+  print(f"Shiro est en ligne en tant que {bot.user}")
+  verifier_statut_et_live.start()
+
+
+# Fonction simulée pour vérifier si tu es en live sur Twitch
+async def verifier_si_en_live():
+  # TODO: Ici tu pourras brancher la vraie vérification d'API Twitch si tu le souhaites.
+  # Pour l'instant, on met False par défaut.
+  return False
+
+
+@tasks.loop(minutes=2)
+async def verifier_statut_et_live():
+  global resume_deja_envoye_ce_matin
+  user = await bot.fetch_user(MON_ID_DISCORD)
+  if not user:
+    return
+
+  heure_actuelle = datetime.now().hour
+  en_live = await verifier_si_en_live()
+
+  # --- GESTION DU STATUT DU BOT ---
+  if en_live:
+    # PEU IMPORTE L'HEURE : Si tu es en live, le bot reste en ligne / streaming
+    await bot.change_presence(
+        status=discord.Status.online,
+        activity=discord.Streaming(
+            name="TETR.IO sur Twitch",
+            url=f"https://twitch.tv/{TWITCH_USERNAME}",
+        ),
+    )
+    # Pendant le live, on remet le compteur de résumé à False pour le lendemain
+    resume_deja_envoye_ce_matin = False
+  else:
+    # Hors live : on respecte les horaires (10h-22h = En ligne, 22h-10h = Veille)
+    if 10 <= heure_actuelle < 22:
+      await bot.change_presence(status=discord.Status.online)
+      # À 10h pile (ou à la première vérification après 10h), on balance le résumé de la nuit s'il y en a un
+      if heure_actuelle == 10 and not resume_deja_envoye_ce_matin:
+        if len(evenements_nuit) > 0:
+          texte_resume = (
+              "🌙 **Résumé des événements reçus pendant la nuit :**\n"
+              + "\n".join(evenements_nuit)
+          )
+          await user.send(texte_resume)
+          evenements_nuit.clear()  # On vide la liste après l'envoi
+        resume_deja_envoye_ce_matin = True
+    else:
+      await bot.change_presence(status=discord.Status.idle)  # Icône de lune
+      # On autorise l'envoi du prochain résumé du matin vu qu'on est la nuit
+      resume_deja_envoye_ce_matin = False
+
+
+# Fonction intelligente qui choisit d'envoyer tout de suite ou de stocker pour le résumé
+async def gerer_notification_ou_stockage(titre: str, description: str):
+  user = await bot.fetch_user(MON_ID_DISCORD)
+  if not user:
+    return
+
+  heure_actuelle = datetime.now().hour
+  en_live = await verifier_si_en_live()
+
+  # Format du message
+  message_complet = f"• **{titre}** : {description}"
+
+  # Si on est en veille (22h à 10h) ET qu'on n'est pas en live : on stocke pour le résumé
+  if (not (10 <= heure_actuelle < 22)) and (not en_live):
+    evenements_nuit.append(message_complet)
+  else:
+    # Sinon (en journée ou en plein live de nuit), on envoie direct en MP !
+    embed = discord.Embed(
+        title=titre, description=description, color=0x9B59B6
+    )
+    await user.send(embed=embed)
+
+
+# --- Exemples d'utilisation ---
+
+
+async def notifier_sub(pseudo: str):
+  await gerer_notification_ou_stockage(
+      "⭐ Nouveau Sub !", f"**{pseudo}** vient de s'abonner !"
+  )
+
+
+async def notifier_don(pseudo: str, montant: str):
+  await gerer_notification_ou_stockage(
+      "💸 Don reçu !", f"**{pseudo}** a donné **{montant}** !"
+  )
 intents.messages = True
 intents.message_content = True
 
