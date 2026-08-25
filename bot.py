@@ -1,7 +1,10 @@
 from datetime import datetime
-import aiohttp  # Nécessaire pour interroger l'API Twitch (ou l'état du live)
+import threading  # <--- C'est ça qu'il manquait !
+import aiohttp
 import discord
 from discord.ext import commands, tasks
+
+# ... le reste de ton code ...
 
 intents = discord.Intents.default()
 intents.message_content = True
