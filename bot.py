@@ -1,13 +1,12 @@
 from datetime import datetime
-import threading  # <--- C'est ça qu'il manquait !
+import threading
 import aiohttp
 import discord
 from discord.ext import commands, tasks
-from flask import Flask  # Assure-toi d'avoir 'flask' dans requirements.txt !
+from flask import Flask, request
 
-# --- 1. Petit serveur web pour Render ---
-@app.route("/webhook-twitch", methods=['POST'])
 app = Flask("")
+
 
 
 @app.route("/")
