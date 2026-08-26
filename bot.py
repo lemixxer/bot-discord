@@ -244,9 +244,7 @@ async def check_night_recap():
             print(f"Erreur envoi récapitulatif nocturne : {e}")
 
 if __name__ == "__main__":
-    t = threading.Thread(target=run_web)
-    t.start()
-  import os
-
-bot.run(os.getenv("TOKEN"))
+  t = threading.Thread(target=run_web)
+  t.start()
+  bot.run(os.getenv("TOKEN"))
 
