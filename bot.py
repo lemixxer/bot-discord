@@ -4,6 +4,7 @@ import threading
 import aiohttp
 import discord
 from discord.ext import commands, tasks
+from flask import Flask  # <-- C'est cette ligne qui manquait ou s'est perdue !
 import pytz
 import requests
 
