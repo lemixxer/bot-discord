@@ -246,4 +246,7 @@ async def check_night_recap():
 if __name__ == "__main__":
     t = threading.Thread(target=run_web)
     t.start()
-    bot.run(TOKEN)
+  import os
+
+bot.run(os.getenv("TOKEN"))
+
